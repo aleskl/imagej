@@ -5,3 +5,6 @@ ImageJ macro for setting white balance of brightfield microscopy images - dark o
 
 ## WB-modes.ijm
 An attempt to automatically correct white balance by using the modes of the RGB histograms. Works well in brightfield microscopy images with a large background area.
+
+## EqualizeStack.ijm
+Normalize brightness of all slices in a stack to the same value. Used this for fluorescence Z-stacks.
