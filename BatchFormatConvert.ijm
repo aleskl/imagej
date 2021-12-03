@@ -21,6 +21,7 @@ singleDirOutput = true; // set this to false if you want files ordered in the or
 inDir = getDirectory("Choose directory containing " + ext + " files "); 
 outDir = getDirectory("Choose directory for " + convertToFormat + " output "); 
 setBatchMode(true); 
+File.makeDirectory(outDir);
 processFiles(inDir, outDir, ""); 
 print("-- Done --"); 
 
@@ -28,7 +29,6 @@ print("-- Done --");
 function processFiles(inBase, outBase, sub) { 
   
   list = getFileList(inBase + sub); 
-  Array.print(list);
   if (!singleDirOutput)
   	File.makeDirectory(outBase + sub); 
   for (i=0; i<list.length; i++) { 
