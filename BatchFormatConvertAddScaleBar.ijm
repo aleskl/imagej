@@ -1,86 +1,117 @@
+// Recursively converts file format using Bio-Formats. 
+// It was originally written to convert Gatan DM3 files
+// Adapted later to accept any Bio-Formats filetype
+
+// Adapted from recursiveTiffConvert.txt by Curtis Rueden
 // Fabrice Senger 09/07/09 
 // Ales Kladnik 08/01/13
 // Ales Kladnik 12/12/18 single dir output, convert to format setting
 // Ales Kladnik 05/11/21 added auto-scalebar, gamma correction
-// Adapted from recursiveTiffConvert.txt by Curtis Rueden
+// Ales Kladnik 14/11/24 added relative scalebar size, added exclude format(s), added conversion to nanometers
 
-// Recursively converts file format using Bio-Formats. 
-
-// It was originally written to convert Gatan DM3 files, but you can easily 
-// change the code to work with any or all extensions of your choice. 
+// TODO: handle stacks (export slices), image resizing
 
 // USER SETTINGS set by script paramenters https://imagej.net/scripting/parameters
-#@File(label = "Input directory", style = "directory") inDir
-#@File(label = "Output directory", style = "directory") outDir
-#@String(label = "Source image format", value = "zvi") ext
-#@String(label = "Convert to format", value = "jpeg") convertToFormat
-#@Double(label = "Gamma correction", value=1, min=0.1, max=2.4, stepSize=0.05, persist=false, style="slider,format:0.00") gamma
-#@Boolean(label = "Include subdirectory name in output file name", value = false) includeDirName
-#@Boolean(label = "Save all output files in a single directory", value = false) singleDirOutput
-#@Boolean(label = "Add scalebar to output images", value = false) addscalebar
-#@String(label = "Scalebar settings", value = "height=10 font=24 color=White background=None location=[Lower Right] bold overlay") scalebarsettings
-
-
-// obsolete:
-// ext = "zvi"; // this variable controls the extension of source files 
-// convertToFormat = "jpeg"; // which format to convert to, from the list of ImageJ save as options
-// includeDirName = false; // set to true if you want to prepend filename with directory name
-// singleDirOutput = false; // set this to false if you want files ordered in the original directory structure
-// addscalebar = true; // add automatical scalebar to output image, works if the source images have spatial calibration
-// scalebarsettings = "height=10 font=24 color=White background=None location=[Lower Right] bold overlay"; // set the appearance of scalebar
-
-// inDir = getDirectory("Choose directory containing " + ext + " files "); 
-// outDir = getDirectory("Choose directory for " + convertToFormat + " output "); 
+#@ File (label = "Input directory", style = "directory") inDir
+#@ File (label = "Output directory", value = "", style = "directory") outDir
+#@ String (label = "Convert to format", value = "png") convertToFormat
+#@ String (label = "Exclude format (multiple formats possible)", value = "") excludeFormats
+#@ Boolean (label = "Auto contrast", value = false) autoContrast
+#@ Double (label = "Gamma correction", value=1, min=0.1, max=2.4, stepSize=0.05, persist=true, style="slider,format:0.00") gamma
+#@ Boolean (label = "Include subdirectory name in output file name", value = false) includeDirName
+#@ Boolean (label = "Save all output files in a single directory", value = false) singleDirOutput
+#@ Boolean (label = "Add scalebar to output images", value = false) addscalebar
+#@ String (label = "Scalebar settings", value = "color=White background=None location=[Lower Right] bold overlay") scalebarsettings
+#@ Double (label = "Scalebar thickness (relative to image height)", value = 0.01, min=0, max=0.1, stepSize=0.01, style="slider,format:0.00") scalebarthickness
+#@ Double (label = "Scalebar font size (relative to image height)", value = 0.05, min=0, max=0.1, stepSize=0.01, style="slider,format:0.00") scalebarfontsize
 
 setBatchMode(true); 
-File.makeDirectory(outDir);
-processFiles(inDir, outDir, ""); 
-print("-- Done --"); 
+inDir += File.separator;
+outDir += File.separator;
+print("Processing image files in: " + inDir); 
+
+// Set outDir to inDir, if outDir in the dialog is empty, to use the original directory for output images.  
+// But it's not so simple, because if outDir is empty, it defaults to Fiji starting directory, eg. c:\Fiji.app, 
+// we can get that with getDir("cwd") and compare with outDir
+// There's a tiny bug with an empty outDir: the script will complain that 'outDir' is required but unset, 
+// the first time you run it with outDir empty. It will however run fine on all the next starts
+if (outDir == getDir("cwd"))
+	outDir = inDir;
+else File.makeDirectory(outDir);
+
+run("Bio-Formats Macro Extensions");  // needed for Ext.isThisType() function below
+
+// process files and folders recursively
+processFiles(inDir, outDir); 
+print("-- Done --\n"); 
 
 // recursively process files and directories
-function processFiles(inBase, outBase, sub) { 
+function processFiles(inBase, outBase) { 
   
-  list = getFileList(inBase + sub); 
+  list = getFileList(inBase); 
   if (!singleDirOutput)
-  	File.makeDirectory(outBase + sub); 
+  	File.makeDirectory(outBase); 
   for (i=0; i<list.length; i++) { 
-    path = sub + list[i]; 
-    if (endsWith(path, File.separator)) { 
-      // recurse into subdirectories 
+    filename = list[i]; 
+    filename = filename.replace("/",File.separator);  // getFileList always returns directories with trailing forward slash, replace with proper File.separator (if using this on Windows)
+    Ext.isThisType(inBase + filename, supportedFileFormat);  // check if it's a supported file type
+    if (endsWith(filename, File.separator)) { 
+      // if the name is a directory, recurse into subdirectory
 	  print("-- going deeper --");
-      processFiles(inBase, outBase, path); 
+      processFiles(inBase + filename, outBase + filename); 
     }
-    // process only files with selected extension
-	else if (endsWith(path.toLowerCase, ext.toLowerCase)) { 
-		print("Processing file: " + path); 
-		run("Bio-Formats Importer", "open='" + inBase + File.separator + path + "' autoscale view=[Standard ImageJ] stack_order=Default"); 
+    // process only files with supported extension, skip exclude formats
+	// check if excludeFormats contains current filename extension
+	else if ( (supportedFileFormat) && !(excludeFormats.contains(substring(filename, lastIndexOf(filename,".")+1))) ) { 
+		print("Processing file: " + inBase + filename); 
 
-		dir = substring(path, 0, lastIndexOf(path, File.separator)+1);
-		filename = substring(path, lastIndexOf(path, File.separator)+1, lengthOf(path));
+		// open supported file formats using Bio-Formats Importer
+		// but Bio-Formats Importer is buggy for scaling units import, sets units to microns everytime
+		// therefore we're checking for too large micrometer scaling and set scaling unit to "nm" below, in the add scalebar section
+		// Alternatively, use ImageJ's open() for TIFs: imports units correctly, but you have to confirm Bio-Formats open dialog for each image for certain Bio-Formats supported file types
+		// comment out the next line and uncomment the open() line to switch image loading method:
+		run("Bio-Formats Importer", "open=[" + inBase + filename + "] autoscale view=Hyperstack stack_order=Default");
+		// open(inBase + filename);
+
+		getPixelSize(unit, pixelWidth, pixelHeight);  // check if image is calibrated, we will use 'unit' below
+
 		if (includeDirName) 
-			filename = replace(dir, File.separator, "_") + filename;
+			filename = replace(outBase.substring(outDir.length), File.separator, "_") + filename;
 		if (singleDirOutput)
-			outputFileName = outDir + File.separator + filename;
+			outputFileName = outDir + filename;
 		else 
-			outputFileName = outDir + dir + File.separator + filename;
-			
-		if (gamma != 1)
-			run("Gamma...", "value="+ gamma + " stack");
-		run("Stack to RGB"); // merges stack generated by ZVI import
+			outputFileName = outBase + filename;
 
-		if (addscalebar) {
+		if (nSlices > 1)
+			run("Stack to RGB"); // merges channels if stack generated by Bio-Formats import
+		if (autoContrast)
+			run("Enhance Contrast", "saturated=0.35");
+		if (gamma != 1) {
+			if (bitDepth() == 32) 
+				run("16-bit");  // gamma correction works differently on 32-bit images, convert to 16-bit first
+			run("Gamma...", "value="+ gamma + " stack");
+		}	
+
+		// add scalebar, but only to spatially calibrated images
+		if (addscalebar && unit != "pixels") {
 			scalebarlen = 1; // initial scale bar length
-			getPixelSize(unit,w,h);
+			getVoxelSize(w,h,d,unit);
 			imagewidth = w*getWidth();
-			while (scalebarlen < imagewidth/10) {
+			if (scalebarlen > imagewidth/2 && unit == "microns") {   // change units to nm if scalebar in micrometers would be larger than half of image
+				setVoxelSize(w*1000,h*1000,d*1000,"nm");
+				getVoxelSize(w,h,d,unit);
+				imagewidth = w*getWidth();
+			}
+			// recursively calculate a 1, 2, 5 series until the scalebar length reaches 1/7th of image width
+			while (scalebarlen < imagewidth/7) {  // because 7 is a magic number :) seriously, scale bar looks better if it's a little longer than 1/10th of the image width
 				scalebarlen = round((scalebarlen*2.3)/(Math.pow(10,(floor(Math.log10(abs(scalebarlen*2.3)))))))*(Math.pow(10,(floor(Math.log10(abs(scalebarlen*2.3))))));
-			} // recursively calculate a 1, 2, 5 series until the scalebar length reaches 1/10th of image width
-			run("Scale Bar...", "width=&scalebarlen "+scalebarsettings);
+			}
+			run("Scale Bar...", "width=&scalebarlen height="+round(scalebarthickness*getHeight())+" font="+round(scalebarfontsize*getHeight())+" "+scalebarsettings);
 		}
 
 		saveAs(convertToFormat, outputFileName); 
 	} 
-	else print("Skipping file: " + path);
+	else print("Skipping file: " + filename);
       
     } 
 } 
