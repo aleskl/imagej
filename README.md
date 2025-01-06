@@ -6,11 +6,11 @@ The updated version uses script parameters for initial setup and has gamma corre
 
 Download https://github.com/aleskl/imagej/blob/master/BatchFormatConvertAddScaleBar.ijm to your Fiji macros folder and run it from the script editor (you can drag and drop the BatchFormatConvertAddScaleBar.ijm file to the Fiji main window and choose Run). It won't work if you use Install, because it's an Imagej v2 macro.
 
-## White balance.ijm
-ImageJ macro for setting white balance of brightfield microscopy images - dark object on a white background. A small area of background needs to be selected before running the macro. This is a modification of a macro by Vytas Bindokas (2006) & Patrice Mascalchi (2014).
-
 ## WB-modes.ijm
-An attempt to automatically correct white balance by using the modes of the RGB histograms. Works well in brightfield microscopy images with a large background area.
+Automatically correct white balance by using the modes of the RGB histograms. Works well in brightfield microscopy images with a large background area. Sampling area for background estimation can be selected before running the macro for more precise results. The macro can be installed via Plugins - Install, and then run on the active image with keyboard shortcut [w].
+
+## White balance.ijm
+Another ImageJ macro for setting white balance of brightfield microscopy images - dark object on a white background. A small area of background needs to be selected before running the macro. This is a modification of a macro by Vytas Bindokas (2006) & Patrice Mascalchi (2014). It uses mean values in RGB channels for channel balancing - it is usually better to use WB-modes.ijm macro.
 
 ## EqualizeStack.ijm
 Normalize brightness of all slices in a stack to the same value. Used this for fluorescence Z-stacks.
