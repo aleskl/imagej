@@ -1,13 +1,13 @@
 /*
  * Macro template to process multiple images in a folder
+ * this version is used for batch scaling calibration and rotation of images
+ * draw a line for 10 cm on each image and a line for vertical orientation
+ * save as calibrated TIF in the end
  */
 
 #@ File (label = "Input directory", style = "directory") input
 #@ File (label = "Output directory", style = "directory") output
 #@ String (label = "File suffix", value = ".jpg") suffix
-
-// See also Process_Folder.py for a version of this code
-// in the Python scripting language.
 
 processFolder(input);
 
