@@ -1,30 +1,37 @@
+// works well with 8-bit RGB images with lots of light background
+// sets background peak to 240 (target)
+// takes a background sample from selection, if an area was selected
+// background values are measured as a Mode of a channel (not averages)
+
 macro "White balance [w]" {
-	ti=getTitle;
-	run("Select None");
+	target = 240;
+	ti = getTitle;
 	setBatchMode(true);
 	run("RGB Color");
 
+	run("Select None");
 	run("Duplicate...", "title=rgbstk-temp");
 	run("RGB Stack");
 
+	run("Restore Selection"); // measure background only in selected area
 	val = newArray(3);
 	for (s=1;s<=3;s++) {
-		setSlice(s);
-		List.setMeasurements; 
-		val[s-1] = List.getValue("Mode");
+		setSlice(s); 
+		val[s-1] = getValue("Mode");
 	}
 
+	run("Select None");
 	for (s=1;s<=3;s++) {
 		setSlice(s);
-		dR=230/val[s-1];
+		dR = target/val[s-1];
 		run("Multiply...", "slice value="+dR);
 	}
 
-	run("Convert Stack to RGB");
 	selectWindow(ti);
 	close();
-	selectWindow("rgbstk-temp (RGB)");
+	selectWindow("rgbstk-temp");
 	rename(ti);
+	run("Convert Stack to RGB");
 
 	setBatchMode(false);
 }
